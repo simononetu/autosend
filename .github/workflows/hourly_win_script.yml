@@ -17,12 +17,10 @@ on:
 # --------------------------
 jobs:
   run-autosend:
-    # 使用 Windows 環境，符合您之前錯誤訊息中的 D:\ 路徑
     runs-on: windows-latest 
     
     steps:
       # 步驟 1: 檢出（Clone）儲存庫程式碼
-      # 這是必須的，它將您的程式碼放到 Runner 的工作目錄
       - name: Checkout repository
         uses: actions/checkout@v4
         
@@ -30,22 +28,15 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10' # 使用一個穩定的版本
+          python-version: '3.10'
           
-      # 步驟 3: 安裝依賴 (解決 ModuleNotFoundError: requests)
-      - name: Install dependencies (requests)
+      # 步驟 3: 安裝依賴
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # 這裡假設您在專案根目錄有 requirements.txt 且內容為 requests
           pip install -r requirements.txt
         
-      # 步驟 4: 執行您的 Python 腳本 (修正路徑)
+      # 步驟 4: 執行您的 Python 腳本
       - name: Execute Python Script
-        # **關鍵修正：** 使用絕對正確的相對路徑。
-        # 根據您專案結構 (simononetu/autosend)，腳本通常位於根目錄下的 autosend 資料夾內。
-        # 我們將路徑設定為相對於工作目錄的 './autosend/小時即時-自動.py'
         run: |
-          python ./autosend/hourly_auto_send.py
-          
-      # 💡 注意: 如果腳本名稱的中文編碼造成問題，您可以嘗試將腳本名稱改為純英文。
-      # 例如：將 '小時即時-自動.py' 改為 'hourly_script.py'
+          python hourly_auto_send.py
