@@ -1,56 +1,57 @@
-name: Hourly Windows Python Script
+# Workflow 的名稱，顯示在 GitHub Actions 頁籤中
+name: Hourly Windows Script Runner
 
-# 1. 設定觸發條件 (每小時執行)
+# --------------------------
+# 觸發條件 (Triggers)
+# --------------------------
 on:
+  # 1. 排程觸發：每小時的第 0 分鐘自動運行 (UTC 時間)
   schedule:
-    # cron 語法：'0 * * * *' 代表每小時的 0 分鐘執行一次 (例如 UTC 1:00, 2:00 等)
-    # ⚠️ 注意：GitHub Actions 的定時任務一律使用 UTC (世界標準時間)
-    - cron: '0 * * * *'
+    # cron 語法: 分 時 日 月 週。 '0 * * * *' 代表每小時的整點
+    - cron: '0 * * * *' 
   
-  # 允許手動執行，方便測試
+  # 2. 手動觸發：允許使用者在 Actions 頁面點擊「Run workflow」按鈕立即執行
   workflow_dispatch:
+    # 這裡可以定義輸入參數，但這次範例我們保持簡單
 
-# 2. 定義工作 (Jobs)
+# --------------------------
+# 工作任務 (Jobs)
+# --------------------------
 jobs:
-  run-hourly-script-on-windows:
-    # 指定在最新的 Windows 虛擬機上運行，模擬 Win11 環境
-    runs-on: windows-latest
+  run-script:
+    # 使用 Windows 環境執行 (因為您的錯誤訊息路徑是 Windows 風格 D:\a\...)
+    runs-on: windows-latest 
     
-    # 3. 定義步驟 (Steps)
+    # 任務步驟 (Steps)
     steps:
-      # 步驟 A: 下載儲存庫程式碼
-      - name: Checkout repository code
+      # 步驟 1: 檢出（Clone）儲存庫程式碼
+      - name: Checkout repository
         uses: actions/checkout@v4
-      
-      # 步驟 B: 設定 Python 環境
-      # actions/setup-python 會自動在 Windows 虛擬機上設定 Python
+        
+      # 步驟 2: 設定 Python 環境
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.x' # 指定使用的 Python 版本
-          # 在 Windows 上，可以明確指定架構 (x64 通常是預設值)
-          architecture: 'x64' 
+          # 建議使用較新的 Python 3 版本
+          python-version: '3.10' 
           
-      # 步驟 C (如果需要): 安裝 Python 依賴套件
-      # 如果您的腳本依賴外部套件，請確保您的儲存庫中有 requirements.txt
-      # - name: Install dependencies
-      #   run: pip install -r requirements.txt
-          
-      # 步驟 D: 執行您的 Python 腳本
-      # 在 Windows 虛擬機上，使用 `python` 運行腳本
-      - name: Execute the hourly script
-        run: python 小時即時-自動.py
-
-      # 步驟 E (可選): 提交腳本產生的變更 (例如日誌或資料文件)
-      # 如果您的 Python 腳本會修改或產生文件，您需要這個步驟將變更推回儲存庫
-      # - name: Commit and Push changes (Optional)
-      #   run: |
-      #     git config --local user.email "action@github.com"
-      #     git config --local user.name "GitHub Action"
-      #     git add .
-      #     git commit -m "Automated hourly data update [Windows Runner]" --allow-empty
-      # - name: Push changes
-      #   uses: ad-m/github-push-action@master
-      #   with:
-      #     github_token: ${{ secrets.GITHUB_TOKEN }}
-      #     branch: ${{ github.ref }}
+      # 步驟 3: 安裝依賴 (解決 ModuleNotFoundError: requests)
+      - name: Install dependencies from requirements.txt
+        run: |
+          # 檢查並升級 pip
+          python -m pip install --upgrade pip
+          # 安裝 requirements.txt 中列出的所有函式庫 (包含 requests)
+          pip install -r requirements.txt
+        # 注意: 在 Windows Runner 中，這裡會使用 PowerShell 或 CMD 執行命令
+        
+      # 步驟 4: 執行您的 Python 腳本
+      - name: Execute Python Script
+        # 使用 python 命令執行您的腳本。
+        # 注意：雖然您的原始路徑有 Unicode 跳脫字元，但在 Actions 環境中直接使用中文檔名更常見。
+        # 由於您提供的錯誤訊息路徑是: D:\a\autosend\autosend\\u5c0f\u6642\u5373\u6642-\u81ea\u52d5.py
+        # 這暗示您的程式碼位於專案根目錄下的一個名為「autosend」的資料夾內。
+        run: |
+          python autosend/小時即時-自動.py
+        
+        # 💡 注意: 如果您的檔案名真的是 Unicode 跳脫字元 (例如在 Git 中被編碼)，
+        # 請調整為實際的檔案路徑。這裡假設您腳本名稱是「小時即時-自動.py」。
