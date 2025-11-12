@@ -5,9 +5,9 @@ name: Hourly Autosend Script Runner
 # 觸發條件 (Triggers)
 # --------------------------
 on:
-  # 1. 排程觸發：每小時的第 0 分鐘自動運行 (UTC 時間)
+  # 1. 排程觸發：每小時的第 10 分鐘自動運行 (UTC 時間)
   schedule:
-    - cron: '0 * * * *' 
+    - cron: '10 * * * *' 
   
   # 2. 手動觸發：允許使用者在 Actions 頁面點擊「Run workflow」按鈕立即執行
   workflow_dispatch:
