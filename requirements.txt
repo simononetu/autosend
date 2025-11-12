@@ -1,1 +1,2 @@
 requests
+python-telegram-bot  # 這是最常用的 Telegram 函式庫
