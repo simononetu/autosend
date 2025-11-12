@@ -45,7 +45,7 @@ jobs:
         # 根據您專案結構 (simononetu/autosend)，腳本通常位於根目錄下的 autosend 資料夾內。
         # 我們將路徑設定為相對於工作目錄的 './autosend/小時即時-自動.py'
         run: |
-          python ./autosend/小時即時-自動.py
+          python ./autosend/hourly_auto_send.py
           
       # 💡 注意: 如果腳本名稱的中文編碼造成問題，您可以嘗試將腳本名稱改為純英文。
       # 例如：將 '小時即時-自動.py' 改為 'hourly_script.py'
