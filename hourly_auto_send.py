@@ -7,7 +7,15 @@ import hashlib
 import logging
 import asyncio  # Added for async support
 import telegram  # Added for direct Bot usage
+from datetime import datetime
+import pytz
 
+# 定義台灣時區常數
+TAIWAN_TZ = pytz.timezone('Asia/Taipei')
+
+def get_taiwan_time():
+    """取得台灣當前時間"""
+    return datetime.now(TAIWAN_TZ)
 # 設定日誌
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -279,7 +287,7 @@ def generate_html(grouped_data, id_map):
     <footer>
         <p>
             資料來源: 交通部中央氣象署 (CWA) | 資料集: {DATA_ID} | 
-            生成時間: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+            生成時間: {get_taiwan_time().strftime("%Y-%m-%d %H:%M:%S")}
         </p>
     </footer>
     <script>
@@ -347,7 +355,7 @@ async def main():  # Changed to async def
         logger.info("正在產生報告...")
         html_content = generate_html(grouped_data, id_map)
         
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        timestamp = get_taiwan_time().strftime('%Y%m%d_%H%M%S')
         filename = f"realtime_weather_{timestamp}.html"
         
         with open(filename, "w", encoding="utf-8") as f:
@@ -366,7 +374,7 @@ async def main():  # Changed to async def
                         f"即時觀測資料已產生！\n"
                         f"縣市數：{len(grouped_data)}\n"
                         f"總站數：{sum(len(v) for v in grouped_data.values())}\n"
-                        f"產生時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                        f"產生時間：{get_taiwan_time().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                         f"請下載後用瀏覽器開啟，選擇您想看的縣市"
                     )
                 )
