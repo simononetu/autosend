@@ -36,7 +36,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
         
-      # 步驟 4: 執行您的 Python 腳本
+      # 步驟 4: 執行您的 Python 腳本（設定台灣時區）
       - name: Execute Python Script
+        env:
+          TZ: 'Asia/Taipei'  # 設定環境時區為台北
         run: |
           python hourly_auto_send.py
