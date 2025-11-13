@@ -5,9 +5,8 @@ import os
 import sys
 import hashlib
 import logging
-import asyncio  # Added for async support
-import telegram  # Added for direct Bot usage
-from datetime import datetime
+import asyncio
+import telegram
 import pytz
 
 # 定義台灣時區常數
@@ -16,6 +15,7 @@ TAIWAN_TZ = pytz.timezone('Asia/Taipei')
 def get_taiwan_time():
     """取得台灣當前時間"""
     return datetime.now(TAIWAN_TZ)
+
 # 設定日誌
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # === 從檔案讀取 API Keys 和 Chat ID ===
 API_KEY_FILE = "API-KEY.txt"
 TELEGRAM_TOKEN_FILE = "TELEGRAM-TOKEN.txt"
-CHAT_ID_FILE = "CHAT-ID.txt"  # 新增: 用來儲存 Telegram 聊天 ID (使用者或群組 ID)
+CHAT_ID_FILE = "CHAT-ID.txt"
 
 def load_api_keys():
     if not os.path.exists(API_KEY_FILE):
@@ -87,6 +87,34 @@ def parse_weather_data(data):
     stations = data["records"]["Station"]
     rows = []
     
+    # === 除錯：檢查前3個測站的資料結構 ===
+    logger.info("=== 資料結構檢查 ===")
+    for i, station in enumerate(stations[:3]):
+        station_name = station.get("StationName", "")
+        elements = station.get("WeatherElement", {})
+        logger.info(f"\n測站 {i+1}: {station_name}")
+        logger.info(f"WeatherElement keys: {list(elements.keys())}")
+        
+        # 檢查 GustInfo
+        if "GustInfo" in elements:
+            logger.info(f"  GustInfo 內容: {elements['GustInfo']}")
+        else:
+            logger.info(f"  GustInfo: 不存在")
+        
+        # 檢查 Now
+        if "Now" in elements:
+            logger.info(f"  Now 內容: {elements['Now']}")
+        else:
+            logger.info(f"  Now: 不存在")
+        
+        # 檢查所有可能的雨量和陣風欄位
+        possible_fields = ['Gust', 'Rainfall', 'Precipitation', 'RAIN', 'GUST']
+        for field in possible_fields:
+            if field in elements:
+                logger.info(f"  發現欄位 {field}: {elements[field]}")
+    
+    logger.info("\n=== 開始解析資料 ===\n")
+    
     for station in stations:
         station_name = station.get("StationName", "")
         geo_info = station.get("GeoInfo", {})
@@ -98,33 +126,81 @@ def parse_weather_data(data):
         local_time = convert_to_local_time(datetime_str)
 
         # 氣象要素
-        weather_elements = {}
         elements = station.get("WeatherElement", {})
-        if isinstance(elements, dict):
-            for key, value in elements.items():
-                if isinstance(value, dict):
-                    val = value.get("value", "")
+        
+        # === 基本欄位處理 ===
+        def get_value(key):
+            """取得欄位值，過濾異常值"""
+            val = elements.get(key, "")
+            if isinstance(val, dict):
+                val = val.get("value", "")
+            if val in ("-99", "-99.0", "-999", "NA", "X", ""):
+                return ""
+            return str(val)
+        
+        # === 陣風：嘗試多種可能的路徑 ===
+        gust_value = ""
+        # 方法1: GustInfo.PeakGustSpeed
+        if isinstance(elements.get("GustInfo"), dict):
+            gust = elements["GustInfo"].get("PeakGustSpeed", "")
+            if gust and gust not in ("-99", "-99.0", "-999", "NA", "X", ""):
+                gust_value = str(gust)
+        # 方法2: 直接的 Gust 欄位
+        if not gust_value:
+            gust_value = get_value("Gust")
+        # 方法3: GUST 欄位
+        if not gust_value:
+            gust_value = get_value("GUST")
+        
+        # === 累積雨量：嘗試多種可能的路徑 ===
+        rainfall_value = ""
+        # 方法1: Now.Precipitation
+        if isinstance(elements.get("Now"), dict):
+            precip = elements["Now"].get("Precipitation", "")
+            if precip and precip not in ("-99", "-99.0", "-999", "NA", "X", "", "-98"):
+                if precip == "T":
+                    rainfall_value = "雨跡"
                 else:
-                    val = value
-                if val in ("-99", "-999", "NA"):
-                    val = ""
-                weather_elements[key] = val
+                    rainfall_value = str(precip)
+        # 方法2: 直接的 Precipitation 欄位
+        if not rainfall_value:
+            precip = get_value("Precipitation")
+            if precip:
+                if precip == "T":
+                    rainfall_value = "雨跡"
+                else:
+                    rainfall_value = precip
+        # 方法3: Rainfall 欄位
+        if not rainfall_value:
+            rainfall_value = get_value("Rainfall")
+        # 方法4: RAIN 欄位
+        if not rainfall_value:
+            rainfall_value = get_value("RAIN")
 
         row = {
             "站名": station_name,
             "時間": local_time or "無資料",
             "DateTime": datetime_str,
             "CountyName": county_name,
-            "AirPressure": weather_elements.get("AirPressure", ""),
-            "AirTemperature": weather_elements.get("AirTemperature", ""),
-            "WindDirection": weather_elements.get("WindDirection", ""),
-            "WindSpeed": weather_elements.get("WindSpeed", ""),
-            "PeakGustSpeed": weather_elements.get("PeakGustSpeed", ""),
-            "Precipitation": weather_elements.get("Precipitation", ""),
-            "RelativeHumidity": weather_elements.get("RelativeHumidity", ""),
-            "Weather": weather_elements.get("Weather", ""),
+            "AirPressure": get_value("AirPressure"),
+            "AirTemperature": get_value("AirTemperature"),
+            "WindDirection": get_value("WindDirection"),
+            "WindSpeed": get_value("WindSpeed"),
+            "Gust": gust_value,
+            "Rainfall": rainfall_value,
+            "RelativeHumidity": get_value("RelativeHumidity"),
+            "Weather": get_value("Weather"),
         }
         rows.append(row)
+    
+    # 統計有資料的站數
+    total_stations = len(rows)
+    gust_count = sum(1 for r in rows if r["Gust"])
+    rainfall_count = sum(1 for r in rows if r["Rainfall"])
+    
+    logger.info(f"總測站數: {total_stations}")
+    logger.info(f"有陣風資料: {gust_count} 站 ({gust_count/total_stations*100:.1f}%)")
+    logger.info(f"有雨量資料: {rainfall_count} 站 ({rainfall_count/total_stations*100:.1f}%)")
     
     grouped_data = {}
     id_map = {}
@@ -311,8 +387,8 @@ def generate_html(grouped_data, id_map):
                         <td>${{row['AirTemperature'] ? row['AirTemperature'] + '°C' : '-'}}</td>
                         <td>${{row['WindDirection'] || '-'}}</td>
                         <td>${{row['WindSpeed'] || '-'}}</td>
-                        <td>${{row['PeakGustSpeed'] || '-'}}</td>
-                        <td>${{row['Precipitation'] || '-'}}</td>
+                        <td>${{row['Gust'] || '-'}}</td>
+                        <td>${{row['Rainfall'] || '-'}}</td>
                         <td>${{row['RelativeHumidity'] ? row['RelativeHumidity'] + '%' : '-'}}</td>
                         <td>${{row['Weather'] || '-'}}</td>
                     </tr>`;
@@ -343,11 +419,17 @@ def generate_html(grouped_data, id_map):
 </html>"""
     return text_html
 
-async def main():  # Changed to async def
+async def main():
     try:
         cwa_key, telegram_token, chat_id = load_api_keys()
         logger.info("正在從 CWA 抓取資料...")
         data = fetch_weather_data(cwa_key)
+        
+        # 儲存原始 JSON 供檢查
+        debug_file = f"debug_raw_data_{get_taiwan_time().strftime('%Y%m%d_%H%M%S')}.json"
+        with open(debug_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        logger.info(f"原始資料已儲存至: {debug_file}")
         
         logger.info("正在解析資料...")
         grouped_data, id_map = parse_weather_data(data)
@@ -364,9 +446,9 @@ async def main():  # Changed to async def
         logger.info("資料處理完成，正在傳送檔案到 Telegram...")
         
         bot = telegram.Bot(token=telegram_token)
-        async with bot:  # Use async context if needed, but for single call, await directly
+        async with bot:
             with open(filename, "rb") as f:
-                await bot.send_document(  # Await the coroutine
+                await bot.send_document(
                     chat_id=chat_id,
                     document=f,
                     filename="臺灣氣象觀測站即時資料_手機優化版.html",
@@ -381,10 +463,11 @@ async def main():  # Changed to async def
         
         os.remove(filename)
         logger.info("傳送完成！")
+        logger.info(f"除錯檔案保留: {debug_file}")
         
     except Exception as e:
         logger.error(f"錯誤: {e}", exc_info=True)
         sys.exit(1)
 
 if __name__ == "__main__":
-    asyncio.run(main())  # Run the async main
+    asyncio.run(main())
