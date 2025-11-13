@@ -15,7 +15,10 @@ logger = logging.getLogger(__name__)
 # === 檔案設定 ===
 API_KEY_FILE = "API-KEY.txt"
 TELEGRAM_TOKEN_FILE = "TELEGRAM-TOKEN.txt"
-CHAT_ID_FILE = "CHAT-ID.txt"  # 已改為 CHAT-ID.txt
+CHAT_ID_FILE = "CHAT-ID.txt"
+
+# 固定輸出的 HTML 檔名
+OUTPUT_HTML_FILENAME = "1週12小時天氣預報.html"
 
 # === 讀取設定 ===
 def load_config():
@@ -227,8 +230,8 @@ def generate_html(grouped_data, id_map):
 
 # === 發送 Telegram ===
 def send_to_telegram(bot_token, chat_id, html_content):
-    timestamp = datetime.now(TW_TIMEZONE).strftime('%Y%m%d_%H%M%S')
-    filename = f"weather_text_{timestamp}.html"
+    # 使用固定檔名
+    filename = OUTPUT_HTML_FILENAME
     
     with open(filename, "w", encoding="utf-8") as f:
         f.write(html_content)
@@ -236,7 +239,6 @@ def send_to_telegram(bot_token, chat_id, html_content):
     url = f"https://api.telegram.org/bot{bot_token}/sendDocument"
     with open(filename, "rb") as f:
         files = {'document': f}
-        # 安全提取地點數量
         try:
             data_start = html_content.find('const ALL_DATA =') + len('const ALL_DATA =')
             data_end = html_content.find(';', data_start)
@@ -254,7 +256,9 @@ def send_to_telegram(bot_token, chat_id, html_content):
         }
         response = requests.post(url, data=data, files=files, timeout=60)
     
-    os.remove(filename)
+    # 刪除暫存檔
+    if os.path.exists(filename):
+        os.remove(filename)
     
     if response.status_code != 200:
         raise Exception(f"Telegram 發送失敗: {response.text}")
